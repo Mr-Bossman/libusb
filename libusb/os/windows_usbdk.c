@@ -390,6 +390,11 @@ static int usbdk_get_config_descriptor_by_value(struct libusb_device *dev, uint8
 	return LIBUSB_ERROR_NOT_FOUND;
 }
 
+static int usbdk_get_platform_device_id(struct libusb_device *dev, char *data, int length)
+{
+	return LIBUSB_ERROR_NOT_SUPPORTED;
+}
+
 static int usbdk_get_active_config_descriptor(struct libusb_device *dev, void *buffer, size_t len)
 {
 	struct usbdk_device_priv *priv = usbi_get_device_priv(dev);
@@ -709,6 +714,7 @@ const struct windows_backend usbdk_backend = {
 	usbdk_get_active_config_descriptor,
 	usbdk_get_config_descriptor,
 	usbdk_get_config_descriptor_by_value,
+	usbdk_get_platform_device_id,
 	usbdk_get_configuration,
 	usbdk_set_configuration,
 	usbdk_claim_interface,

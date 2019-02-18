@@ -1007,6 +1007,28 @@ uint8_t API_EXPORTED libusb_get_device_address(libusb_device *dev)
 }
 
 /** \ingroup libusb_dev
+ * Get a platform id string of the device on the bus it is connected to.
+ *
+ * Linux:   udev_device_new_from_subsystem_sysname(,"usb",id);
+ * macOS:   IORegistryEntryFromPath(,id)
+ * Windows: CM_Locate_DevNodeA(,id,)
+ *
+ * \param dev a device
+ * \param data a buffer to hold the string
+ * \param length the length of the buffer
+ * \returns the device address
+ */
+int API_EXPORTED libusb_get_platform_device_id(libusb_device *dev, char *data, int length)
+{
+	int ret = LIBUSB_ERROR_NOT_SUPPORTED;
+
+	if (usbi_backend.get_platform_device_id)
+		ret = usbi_backend.get_platform_device_id(dev, data, length);
+
+	return ret;
+}
+
+/** \ingroup libusb_dev
  * Get the negotiated connection speed for a device.
  * \param dev a device
  * \returns a \ref libusb_speed code, where LIBUSB_SPEED_UNKNOWN means that
