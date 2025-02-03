@@ -1407,6 +1407,18 @@ out:
 	return r;
 }
 
+static int op_get_dev_path(struct libusb_device *dev, int dev_type,
+		void *buffer, size_t len) {
+	struct linux_device_priv *priv = usbi_get_device_priv(dev);
+	char filename[256];
+
+	snprintf(filename, sizeof(filename), SYSFS_DEVICE_PATH "/%s", priv->sysfs_dir);
+#if defined(HAVE_LIBUDEV)
+	return linux_udev_get_dev_path(filename, dev_type, buffer, len);
+#endif
+	return -1;
+}
+
 static int op_open(struct libusb_device_handle *handle)
 {
 	int fd, r;
@@ -2793,6 +2805,7 @@ const struct usbi_os_backend usbi_backend = {
 	.get_config_descriptor_by_value = op_get_config_descriptor_by_value,
 
 	.wrap_sys_device = op_wrap_sys_device,
+	.get_dev_path = op_get_dev_path,
 	.open = op_open,
 	.close = op_close,
 	.get_configuration = op_get_configuration,

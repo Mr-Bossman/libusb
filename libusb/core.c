@@ -905,6 +905,33 @@ void API_EXPORTED libusb_free_device_list(libusb_device **list,
 	free(list);
 }
 
+int API_EXPORTED libusb_get_blockdev_path(libusb_device *dev, char *path, size_t path_length)
+{
+	int r;
+
+	usbi_dbg(DEVICE_CTX(dev), "get_dev_path");
+
+	if (!usbi_backend.get_dev_path)
+		return LIBUSB_ERROR_NOT_SUPPORTED;
+
+	r = usbi_backend.get_dev_path(dev, 1, path, path_length);
+	if (r < 0) {
+		usbi_dbg(DEVICE_CTX(dev), "get_dev_path returns %d", r);
+		return r;
+	}
+
+	return 0;
+}
+
+int API_EXPORTED libusb_get_chardev_path(libusb_device *dev, char *path, size_t path_length)
+{
+	(void)dev;
+	(void)path;
+	(void)path_length;
+
+	return -1;
+}
+
 /** \ingroup libusb_dev
  * Get the number of the bus that a device is connected to.
  * \param dev a device

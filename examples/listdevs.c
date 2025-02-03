@@ -18,6 +18,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "libusb.h"
 
@@ -25,7 +26,8 @@ static void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
 	int i = 0, j = 0;
-	uint8_t path[8]; 
+	uint8_t path[8];
+	char blockdev_path[256];
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
@@ -45,6 +47,10 @@ static void print_devs(libusb_device **devs)
 			for (j = 1; j < r; j++)
 				printf(".%d", path[j]);
 		}
+
+		libusb_get_blockdev_path(dev, blockdev_path, 256);
+		printf(" blockdev: %s, %ld", blockdev_path, strlen(blockdev_path));
+		memset(blockdev_path, 0, 256);
 		printf("\n");
 	}
 }

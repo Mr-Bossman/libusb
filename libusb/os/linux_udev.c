@@ -30,6 +30,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdio.h>
 
 /* udev context */
 static struct udev *udev_ctx = NULL;
@@ -298,6 +299,94 @@ int linux_udev_scan_devices(struct libusb_context *ctx)
 
 		linux_enumerate_device(ctx, busnum, devaddr, sys_name);
 		udev_device_unref(udev_dev);
+	}
+
+	udev_enumerate_unref(enumerator);
+
+	return LIBUSB_SUCCESS;
+}
+
+static struct udev_device* get_child(struct udev* udev, struct udev_device* parent, const char* subsystem, const char *property, const char *value)
+{
+	struct udev_device *child;
+	struct udev_list_entry *devices;
+	struct udev_enumerate *enumerate;
+	const char *path;
+
+	enumerate = udev_enumerate_new(udev);
+	udev_enumerate_add_match_parent(enumerate, parent);
+	udev_enumerate_add_match_subsystem(enumerate, subsystem);
+	if(property && value)
+		udev_enumerate_add_match_property(enumerate, property, value);
+
+	udev_enumerate_scan_devices(enumerate);
+
+	devices = udev_enumerate_get_list_entry(enumerate);
+	if (devices == NULL) {
+		udev_enumerate_unref(enumerate);
+		return NULL;
+	}
+
+	devices = udev_list_entry_get_next(devices);
+	if (devices == NULL) {
+		udev_enumerate_unref(enumerate);
+		return NULL;
+	}
+
+	path = udev_list_entry_get_name(devices);
+	if (path == NULL) {
+		udev_enumerate_unref(enumerate);
+		return NULL;
+	}
+
+	child = udev_device_new_from_syspath(udev, path);
+	udev_enumerate_unref(enumerate);
+
+	return child;
+}
+
+int linux_udev_get_dev_path(const char *sys_name, int dev_type, void *buffer, size_t len)
+{
+	struct udev_enumerate *enumerator;
+	struct udev_list_entry *devices, *entry;
+	struct udev_device *udev_dev;
+	const char *path;
+
+	assert(udev_ctx != NULL);
+
+	udev_dev = udev_device_new_from_syspath(udev_ctx, sys_name);
+	if(get_child(udev_ctx, udev_dev, "usb", "DEVTYPE", "usb_device") != NULL) {
+		return 0;
+	}
+
+	enumerator = udev_enumerate_new(udev_ctx);
+	if (NULL == enumerator) {
+		usbi_err(NULL, "error creating udev enumerator");
+		return LIBUSB_ERROR_OTHER;
+	}
+
+	udev_enumerate_add_match_parent(enumerator, udev_dev);
+	udev_enumerate_add_match_subsystem(enumerator, "block");
+	udev_enumerate_scan_devices(enumerator);
+	devices = udev_enumerate_get_list_entry(enumerator);
+
+	udev_device_unref(udev_dev);
+
+	entry = NULL;
+	udev_list_entry_foreach(entry, devices) {
+		udev_dev = udev_device_new_from_syspath(udev_ctx, udev_list_entry_get_name(entry));
+
+		if(get_child(udev_ctx, udev_dev, "block", NULL, NULL) == NULL) {
+			udev_device_unref(udev_dev);
+			continue;
+		}
+
+		path = udev_device_get_devnode(udev_dev);
+		if(path)
+			strncpy(buffer, path, len);
+
+		udev_device_unref(udev_dev);
+		break;
 	}
 
 	udev_enumerate_unref(enumerator);
