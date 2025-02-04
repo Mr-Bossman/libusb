@@ -84,6 +84,7 @@ static bool libusb_darwin_at_started;
 
 static void darwin_exit(struct libusb_context *ctx);
 static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
+static int darwin_get_dev_path(struct libusb_device *dev, int dev_type, void *buffer, size_t len);
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
@@ -1025,6 +1026,44 @@ static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t confi
     return ret;
 
   return (int) len;
+}
+
+static int darwin_get_dev_path(struct libusb_device *dev, int dev_type, void *buffer, size_t len) {
+  struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
+  usb_device_t *darwin_device = priv->device;
+  IOUSBFindInterfaceRequest request;
+  IOReturn                  kresult;
+  io_iterator_t             interface_iterator;
+  UInt8                     bInterfaceNumber;
+  io_service_t              service;
+  bool                      ret;
+
+  if (0 == priv->active_config)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  *service = IO_OBJECT_NULL;
+
+  /* Setup the Interface Request */
+  request.bInterfaceClass    = kIOUSBFindInterfaceDontCare;
+  request.bInterfaceSubClass = kIOUSBFindInterfaceDontCare;
+  request.bInterfaceProtocol = kIOUSBFindInterfaceDontCare;
+  request.bAlternateSetting  = kIOUSBFindInterfaceDontCare;
+
+  kresult = (*darwin_device)->CreateInterfaceIterator(darwin_device, &request, &interface_iterator);
+  if (kresult != kIOReturnSuccess)
+    return kresult;
+
+  while ((*service = IOIteratorNext(interface_iterator))) {
+    /* find the interface number */
+    ret = get_ioregistry_value_number (*usbInterfacep, CFSTR("bInterfaceNumber"), kCFNumberSInt8Type,
+                                       &bInterfaceNumber);
+    (void) IOObjectRelease (*service);
+  }
+
+  /* done with the interface iterator */
+  IOObjectRelease(interface_iterator);
+
+  return LIBUSB_SUCCESS;
 }
 
 /* check whether the os has configured the device */
@@ -2929,6 +2968,7 @@ const struct usbi_os_backend usbi_backend = {
         .get_device_list = NULL,
         .hotplug_poll = darwin_hotplug_poll,
         .wrap_sys_device = NULL,
+	.get_dev_path = darwin_get_dev_path,
         .open = darwin_open,
         .close = darwin_close,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,
