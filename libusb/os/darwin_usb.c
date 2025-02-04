@@ -84,6 +84,7 @@ static bool libusb_darwin_at_started;
 
 static void darwin_exit(struct libusb_context *ctx);
 static int darwin_get_config_descriptor(struct libusb_device *dev, uint8_t config_index, void *buffer, size_t len);
+static int darwin_get_dev_path(struct libusb_device *dev, int iface_idx, enum usbi_dev_type dev_type, void *buffer, size_t len);
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_release_interface(struct libusb_device_handle *dev_handle, uint8_t iface);
 static int darwin_reenumerate_device(struct libusb_device_handle *dev_handle, bool capture);
@@ -1763,6 +1764,53 @@ static enum libusb_error get_endpoints (struct libusb_device_handle *dev_handle,
   return LIBUSB_SUCCESS;
 }
 
+static int darwin_get_dev_path(struct libusb_device *dev, int iface_idx,
+	enum usbi_dev_type dev_type, void *buffer, size_t len) {
+
+  struct darwin_cached_device *priv = DARWIN_CACHED_DEVICE(dev);
+  usb_device_t                darwin_device = priv->device;
+  io_service_t                usbInterface = IO_OBJECT_NULL;
+  io_service_t                service = IO_OBJECT_NULL;
+  io_iterator_t               iterator = MACH_PORT_NULL;
+  IOReturn                    kresult;
+  int                         config_index;
+  char *port_name;
+
+  if (0 == priv->active_config)
+    return LIBUSB_ERROR_NOT_FOUND;
+
+  config_index = get_configuration_index (dev, priv->active_config);
+  if (config_index < 0)
+    return config_index;
+
+  kresult = darwin_get_interface(darwin_device, iface_idx, &usbInterface);
+  if (kresult != kIOReturnSuccess)
+    return darwin_to_libusb (kresult);
+
+  if (!usbInterface) {
+    usbi_info (NULL, "interface not found");
+    return LIBUSB_ERROR_NOT_FOUND;
+  }
+
+  kern_return_t result = IORegistryEntryCreateIterator(
+            usbInterface, kIOServicePlane, kIORegistryIterateRecursively, &iterator);
+
+  while ((service = IOIteratorNext (iterator)) != MACH_PORT_NULL) {
+
+    if (IOObjectConformsTo(service, kIOSerialBSDServiceValue)){
+
+	CFTypeRef cf_value = IORegistryEntryCreateCFProperty(service, CFSTR(kIOCalloutDeviceKey), kCFAllocatorDefault, 0);
+	 char buffer[256];
+       CFStringGetCString(cf_value, buffer, sizeof(buffer),
+            kCFStringEncodingASCII);
+	puts(buffer);
+    }
+    IOObjectRelease(service);
+  }
+
+  return LIBUSB_SUCCESS;
+}
+
 static int darwin_claim_interface(struct libusb_device_handle *dev_handle, uint8_t iface) {
   struct darwin_cached_device *dpriv = DARWIN_CACHED_DEVICE(dev_handle->dev);
   struct darwin_device_handle_priv *priv = usbi_get_device_handle_priv(dev_handle);
@@ -2929,6 +2977,7 @@ const struct usbi_os_backend usbi_backend = {
         .get_device_list = NULL,
         .hotplug_poll = darwin_hotplug_poll,
         .wrap_sys_device = NULL,
+	.get_dev_path = darwin_get_dev_path,
         .open = darwin_open,
         .close = darwin_close,
         .get_active_config_descriptor = darwin_get_active_config_descriptor,

@@ -30,6 +30,10 @@
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOCFPlugIn.h>
 
+#include <IOKit/IOKitLib.h>
+#include <IOKit/serial/IOSerialKeys.h>
+#include <IOKit/serial/ioss.h>
+
 #if defined(HAVE_IOKIT_USB_IOUSBHOSTFAMILYDEFINITIONS_H)
 #include <IOKit/usb/IOUSBHostFamilyDefinitions.h>
 #endif
