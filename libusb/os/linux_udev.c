@@ -348,15 +348,17 @@ static struct udev_device* get_child(struct udev* udev, struct udev_device* pare
 int linux_udev_get_dev_path(const char *sys_name, int dev_type, void *buffer, size_t len)
 {
 	struct udev_enumerate *enumerator;
-	struct udev_list_entry *devices, *entry;
+	struct udev_list_entry *devices, *entry = NULL;
 	struct udev_device *udev_dev;
-	const char *path;
+	const char *path = NULL;
+
+	(void) dev_type;
 
 	assert(udev_ctx != NULL);
 
 	udev_dev = udev_device_new_from_syspath(udev_ctx, sys_name);
 	if(get_child(udev_ctx, udev_dev, "usb", "DEVTYPE", "usb_device") != NULL) {
-		return 0;
+		return LIBUSB_ERROR_OTHER;
 	}
 
 	enumerator = udev_enumerate_new(udev_ctx);
@@ -372,7 +374,6 @@ int linux_udev_get_dev_path(const char *sys_name, int dev_type, void *buffer, si
 
 	udev_device_unref(udev_dev);
 
-	entry = NULL;
 	udev_list_entry_foreach(entry, devices) {
 		udev_dev = udev_device_new_from_syspath(udev_ctx, udev_list_entry_get_name(entry));
 
@@ -391,7 +392,7 @@ int linux_udev_get_dev_path(const char *sys_name, int dev_type, void *buffer, si
 
 	udev_enumerate_unref(enumerator);
 
-	return LIBUSB_SUCCESS;
+	return path ? LIBUSB_SUCCESS : LIBUSB_ERROR_NOT_FOUND;
 }
 
 void linux_udev_hotplug_poll(void)

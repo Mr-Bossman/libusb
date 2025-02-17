@@ -48,9 +48,8 @@ static void print_devs(libusb_device **devs)
 				printf(".%d", path[j]);
 		}
 
-		libusb_get_blockdev_path(dev, blockdev_path, 256);
-		printf(" blockdev: %s, %ld", blockdev_path, strlen(blockdev_path));
-		memset(blockdev_path, 0, 256);
+		if (libusb_get_blockdev_path(dev, blockdev_path, 256) == LIBUSB_SUCCESS)
+			printf(" blockdev: %s, %ld", blockdev_path, strlen(blockdev_path));
 		printf("\n");
 	}
 }
