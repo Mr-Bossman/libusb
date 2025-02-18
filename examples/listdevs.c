@@ -49,7 +49,8 @@ static void print_devs(libusb_device **devs)
 		}
 
 		if (libusb_get_blockdev_path(dev, 0, blockdev_path, 256) == LIBUSB_SUCCESS)
-			printf(" blockdev: %s, %ld", blockdev_path, strlen(blockdev_path));
+			printf("");
+			//printf(" blockdev: %p, %ld", blockdev_path, strlen(blockdev_path));
 		printf("\n");
 	}
 }

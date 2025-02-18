@@ -1791,12 +1791,13 @@ static int darwin_get_dev_path(struct libusb_device *dev, int iface_idx,
     usbi_info (NULL, "interface not found");
     return LIBUSB_ERROR_NOT_FOUND;
   }
+	  puts("goober");
 
   kern_return_t result = IORegistryEntryCreateIterator(
             usbInterface, kIOServicePlane, kIORegistryIterateRecursively, &iterator);
 
   while ((service = IOIteratorNext (iterator)) != MACH_PORT_NULL) {
-
+	  puts("goober");
     if (IOObjectConformsTo(service, kIOSerialBSDServiceValue)){
 
 	CFTypeRef cf_value = IORegistryEntryCreateCFProperty(service, CFSTR(kIOCalloutDeviceKey), kCFAllocatorDefault, 0);
