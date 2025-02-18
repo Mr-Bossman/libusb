@@ -1514,7 +1514,10 @@ static int op_get_dev_path(struct libusb_device *dev, int dev_type,
 	if (ret < 0)
 		return LIBUSB_ERROR_NO_MEM;
 
-	ret = get_subsytem(DEVICE_CTX(dev), buffer, len, dir, "/sys/class/block", 0);
+	if (dev_type == 1)
+		ret = get_subsytem(DEVICE_CTX(dev), buffer, len, dir, "/sys/class/block", 0);
+	else 
+		ret = get_subsytem(DEVICE_CTX(dev), buffer, len, dir, "/sys/class/tty", 0);
 	free(dir);
 
 	return ret;

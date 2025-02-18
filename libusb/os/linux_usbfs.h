@@ -163,7 +163,6 @@ extern usbi_mutex_static_t linux_hotplug_lock;
 int linux_udev_start_event_monitor(void);
 int linux_udev_stop_event_monitor(void);
 int linux_udev_scan_devices(struct libusb_context *ctx);
-int linux_udev_get_dev_path(const char *sys_name, int dev_type, void *buffer, size_t len);
 void linux_udev_hotplug_poll(void);
 #else
 int linux_netlink_start_event_monitor(void);
