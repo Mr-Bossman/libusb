@@ -37,6 +37,7 @@
 #include <sys/utsname.h>
 #include <sys/vfs.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 /* sysfs vs usbfs:
  * opening a usbfs node causes the device to be resumed, so we attempt to
@@ -514,7 +515,7 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 		close(fd);
 		if (r == ENODEV)
 			return LIBUSB_ERROR_NO_DEVICE;
-		usbi_err(ctx, "attribute %s read failed, errno=%zd", attr, r);
+		printf("attribute %s read failed, errno=%zd", attr, r);
 		return LIBUSB_ERROR_IO;
 	}
 	close(fd);
@@ -526,10 +527,12 @@ static int read_sysfs_attr(struct libusb_context *ctx,
 		return 0;
 	}
 
+
 	/* The kernel does *not* NUL-terminate the string, but every attribute
-	 * should be terminated with a newline character. */
-	if (!isdigit(buf[0])) {
-		usbi_err(ctx, "attribute %s doesn't have numeric value?", attr);
+	 * should be terminated with a newline character.
+	 * bmAttributes and bNumInterfaces have a leading space */
+	if (!isdigit(buf[0]) && (r <= 1 || !isdigit(buf[1])) ) {
+		printf("attribute %s doesn't have numeric value?", attr);
 		return LIBUSB_ERROR_IO;
 	} else if (buf[r - 1] != '\n') {
 		usbi_warn(ctx, "attribute %s doesn't end with newline?", attr);
@@ -1407,16 +1410,114 @@ out:
 	return r;
 }
 
+static int check_subsystem(const char *sys_path, const char* subsystem)
+{
+	char *path, *subsystem_path;
+	int ret; 
+
+	ret = asprintf(&path, "%s/subsystem", sys_path);
+	if (ret < 0)
+		return LIBUSB_ERROR_NO_MEM;
+
+	subsystem_path = realpath(path, NULL);
+	free(path);
+	if (!subsystem_path && errno == ENOMEM)
+		return LIBUSB_ERROR_NO_MEM;
+
+	if (subsystem_path) {
+		ret = !!strcmp(subsystem_path, subsystem);
+		free(subsystem_path);
+	}
+
+	return ret;
+}
+
+static int get_subsytem(struct libusb_context *ctx, char *buf, size_t len,
+	const char *dir, const char* subsystem, int depth)
+{
+	DIR *dp;
+	struct dirent *entry;
+	struct stat statbuf;
+	char *path;
+	int ret;
+	
+	if (depth >= 20)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	ret = check_subsystem(dir, subsystem);
+	if (ret < 0)
+		return ret;
+
+	if (!ret) {
+		path = strrchr(dir, '/');
+		if(path) {
+			strncpy(buf, path + 1, len);
+			return LIBUSB_SUCCESS;
+		}
+	}
+	ret = LIBUSB_ERROR_NOT_FOUND;
+
+	if ((dp = opendir(dir)) == NULL) {
+		usbi_err(ctx, "opendir devices failed, errno=%d", errno);
+		return LIBUSB_ERROR_IO;
+	}
+
+	while ((entry = readdir(dp)) != NULL) {
+		if(strcmp(".", entry->d_name) == 0 ||
+		   strcmp("..", entry->d_name) == 0)
+			continue;
+
+		ret = asprintf(&path, "%s/%s", dir, entry->d_name);
+		if (ret < 0) {
+			ret = LIBUSB_ERROR_NO_MEM;
+			break;
+		}
+
+		ret = lstat(path, &statbuf);
+		if (ret < 0) {
+			free(path);
+			ret = LIBUSB_ERROR_IO;
+			break;
+		}
+
+		ret = LIBUSB_ERROR_NOT_FOUND;
+		if (S_ISDIR(statbuf.st_mode))
+			ret = get_subsytem(ctx, buf, len, path, subsystem, depth + 1);
+		free(path);
+
+		if (ret != LIBUSB_ERROR_NOT_FOUND)
+			break;
+	}
+
+	closedir(dp);
+	return ret;
+}
+
 static int op_get_dev_path(struct libusb_device *dev, int dev_type,
 		void *buffer, size_t len) {
 	struct linux_device_priv *priv = usbi_get_device_priv(dev);
-	char filename[256];
+	int ret;
+	int interface = 0;
+	int config = 1; /* to please compiler */
+	char *dir;
 
-	snprintf(filename, sizeof(filename), SYSFS_DEVICE_PATH "/%s", priv->sysfs_dir);
-#if defined(HAVE_LIBUDEV)
-	return linux_udev_get_dev_path(filename, dev_type, buffer, len);
-#endif
-	return -1;
+	(void) dev_type;
+
+	if (!priv->sysfs_dir)
+		return LIBUSB_ERROR_NOT_FOUND;
+
+	/* root hub? */
+	if (!strchr(priv->sysfs_dir, '-'))
+		return -1;
+	
+	ret = asprintf(&dir,  SYSFS_DEVICE_PATH "/%s:%d.%d", priv->sysfs_dir, config, interface);
+	if (ret < 0)
+		return LIBUSB_ERROR_NO_MEM;
+
+	ret = get_subsytem(DEVICE_CTX(dev), buffer, len, dir, "/sys/class/block", 0);
+	free(dir);
+
+	return ret;
 }
 
 static int op_open(struct libusb_device_handle *handle)
