@@ -17,7 +17,10 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "libusb.h"
 
@@ -25,7 +28,8 @@ static void print_devs(libusb_device **devs)
 {
 	libusb_device *dev;
 	int i = 0, j = 0;
-	uint8_t path[8]; 
+	uint8_t path[8];
+	char *blockdev_path, *chardev_path;
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
@@ -35,16 +39,29 @@ static void print_devs(libusb_device **devs)
 			return;
 		}
 
-		printf("%04x:%04x (bus %d, device %d)",
-			desc.idVendor, desc.idProduct,
-			libusb_get_bus_number(dev), libusb_get_device_address(dev));
+		printf("Bus %03d Device %03d: ID: %04x:%04x",
+			libusb_get_bus_number(dev), libusb_get_device_address(dev),
+			desc.idVendor, desc.idProduct);
 
 		r = libusb_get_port_numbers(dev, path, sizeof(path));
 		if (r > 0) {
-			printf(" path: %d", path[0]);
+			printf(" Path: %d", path[0]);
 			for (j = 1; j < r; j++)
 				printf(".%d", path[j]);
 		}
+
+		if(!libusb_get_blockdev_path(dev, 0, &blockdev_path))
+			printf(" Blockdev: %s", blockdev_path);
+
+		if(blockdev_path)
+			free(blockdev_path);
+
+
+		if(!libusb_get_chardev_path(dev, 0, &chardev_path))
+			printf(" Chardev: %s", chardev_path);
+
+		if(chardev_path)
+			free(chardev_path);
 		printf("\n");
 	}
 }
