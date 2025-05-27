@@ -23,9 +23,10 @@
 
 static void print_devs(libusb_device **devs)
 {
+	struct libusb_device_handle *devh = NULL;
 	libusb_device *dev;
-	int i = 0, j = 0;
-	uint8_t path[8]; 
+	int rc, i = 0, j = 0;
+	uint8_t path[8];
 
 	while ((dev = devs[i++]) != NULL) {
 		struct libusb_device_descriptor desc;
@@ -34,6 +35,18 @@ static void print_devs(libusb_device **devs)
 			fprintf(stderr, "failed to get device descriptor");
 			return;
 		}
+
+		rc = libusb_open(dev, &devh);
+		if (rc < 0) {
+			fprintf(stderr, "Error opening USB device: %s\n", libusb_error_name(rc));
+			return;
+		}
+
+		rc = libusb_attach_kernel_driver(devh, 0);
+		if (rc < 0)
+			fprintf(stderr, "Error attaching kernel driver: %s\n", libusb_error_name(rc));
+
+		libusb_close(devh);
 
 		printf("%04x:%04x (bus %d, device %d)",
 			desc.idVendor, desc.idProduct,
