@@ -2666,7 +2666,7 @@ int API_EXPORTED libusb_init_context(libusb_context **ctx, const struct libusb_i
 	}
 
 	/* apply any options provided by the user */
-	for (int i = 0 ; i < num_options ; ++i) {
+	for (uint8_t i = 0 ; i < num_options ; ++i) {
 		switch(options[i].option) {
 		case LIBUSB_OPTION_LOG_CB:
 			r = libusb_set_option(_ctx, options[i].option, options[i].value.log_cbval);
