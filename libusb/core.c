@@ -24,6 +24,7 @@
 
 #include "libusbi.h"
 #include "version.h"
+#include "libusbi.h"
 
 #ifdef __ANDROID__
 #include <android/log.h>
